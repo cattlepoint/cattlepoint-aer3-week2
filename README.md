@@ -425,6 +425,46 @@ Events:                   <none>
 ```
 
 ## 40 points – Deploy your application, including a backend database
+### In this section we will deploy the previous containers in EKS
+* Update the cattlepoint-deployment.v1.yaml in a text editor and replace the <ACCOUNT_ID> with your account id
+* Apply the Kubernetes template cattlepoint-deployment.v1.yaml
+```sh
+kubectl apply -f cattlepoint-deployment.v1.yaml
+```
+* Expected output:
+```sh
+% kubectl apply -f cattlepoint-deployment.v1.yaml
+persistentvolumeclaim/mariadb-pvc created
+deployment.apps/cattlepoint-database created
+service/cattlepoint-database created
+deployment.apps/cattlepoint-backend created
+service/cattlepoint-backend created
+deployment.apps/cattlepoint-frontend created
+service/cattlepoint-frontend created
+```
+* Check if the pods are running:
+```sh
+kubectl get pods
+```
+* Expected output (container id and date will vary):
+```sh
+% kubectl get pods
+```
+* Obtain the URL of the frontend service:
+```sh
+kubectl get svc cattlepoint-frontend
+```
+* Expected output (container id and date will vary):
+```sh
+% kubectl get svc cattlepoint-frontend
+NAME                   TYPE           CLUSTER-IP      EXTERNAL-IP                                                              PORT(S)        AGE
+cattlepoint-frontend   LoadBalancer   10.100.210.28   a45e9b9d7bf194569a3af2ef84f92e79-114768359.us-east-1.elb.amazonaws.com   80:31911/TCP   117s
+```
+* Open the cattlepoint website:
+```sh
+open http://a45e9b9d7bf194569a3af2ef84f92e79-114768359.us-east-1.elb.amazonaws.com
+```
+
 ## 10 points – Test updating your application using rolling updates
 ## Clean up your cluster
 ### In this section you will delete the EKS cluster and the ECR repositories
