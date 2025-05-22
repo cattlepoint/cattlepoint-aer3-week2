@@ -1,0 +1,4 @@
+flask
+flask-cors
+mariadb==1.1.*
+pyjwt
