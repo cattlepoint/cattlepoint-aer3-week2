@@ -11,7 +11,7 @@ Capstone Project for AWS ER - Week 2
 ## Prerequisite
 ### This section is to ensure you have access to the AWS account and the necessary credentials
 * Request access to private repo cattlepoint/cattlepoint-aer3-week2
-* Login to [AWS Account eruser315account](https://eruser315account.signin.aws.amazon.com/console) using username eruser315 and password *****
+* Login to [AWS Account eruser315account](https://eruser315account.signin.aws.amazon.com/console) using username eruser315 and password ***
 * [Download AWS Access Keys](https://us-east-1.console.aws.amazon.com/iam/home?region=us-east-1#/security_credentials/access-key-wizard) file eruser315_accessKeys.csv by selecting Command Line Interface (CLI) and I understand the above recommendation and want to proceed to create an access key -> Next
 
 ## 20 points – Create and configure your deployment environment
@@ -41,7 +41,7 @@ Default output format [json]:
 export AWS_PROFILE=eruser315
 aws sts get-caller-identity
 ```
-* Visually verify in output: arn:aws:iam::****:user/eruser315
+* Visually verify in output: arn:aws:iam::***:user/eruser315
 
 ### This section installs the latest version of the Kubernetes Command Line Tool, Amazon Elastic Kubernetes Service (Amazon EKS) Command Line Tool (eksctl), Podman (Docker), Helm, project dependencies and verifies they are working
 * Perform these steps in the MacOS terminal to install podman, git, github client, kubectl, and eksctl:
@@ -56,39 +56,353 @@ gh login
 ```sh
 gh auth status
 ```
-
 * Expected output (contents will vary):
 ```sh
 ✓ Logged in to github.com account
 ```
-
 * Verify the git tool is working:
 ```sh
 git --version
 ```
-
 * Verify the the Kubernetes CLI is working:
 ```sh
 kubectl version --client
 ```
-
 * Verify the the eksctl is working:
 ```sh
 eksctl version
 ```
-
 * Verify podman is working:
 ```sh
 podman -v
 ```
-
 * Verify helm is working:
 ```sh
 helm version
 ```
 
-
 ## 20 points – Containerize and store your images in a repository
+### In this section you will the Dockerfiles, build the images, and push them to the Amazon Elastic Container Registry (ECR) repositories
+* For this section, you will need to have cloned the repository to your local machine.  You can do this by running the following command in your terminal:
+```sh
+gh repo clone cattlepoint/cattlepoint-aer3-week2
+```
+* For this section, make sure you are in the repository directory:
+```sh
+cd cattlepoint-aer3-week2
+```
+* Verify AWS credentials are working:
+```sh
+export AWS_PROFILE=eruser315
+aws sts get-caller-identity
+```
+* Visually verify in output: arn:aws:iam::***:user/eruser315
+
+#### This section creates the database container, pushes it to the ECR repository, and runs the container
+* Create the ECR repository for the database container:
+```sh
+aws ecr create-repository --repository-name cattlepoint-database --query 'repository.repositoryUri' --output text
+```
+* Expected output:
+```sh
+***.dkr.ecr.us-east-1.amazonaws.com/cattlepoint-database
+```
+* Log podman into the new database container ECR repository:
+```sh
+podman login -u AWS -p $(aws ecr get-login-password) $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text)
+```
+* Expected output:
+```sh
+Login Succeeded!
+```
+* Create the Docker container for the database container using the supplied database Dockerfile:
+```sh
+podman build -t $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text):latest database/.
+```
+* Push the database container to the ECR repository:
+```sh
+podman push $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text):latest
+```
+* Delete the local copy of the database container image:
+```sh
+podman image rm $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text):latest
+```
+* Start the database container using the ECR repository:
+```sh
+podman run -d --name cattlepoint-database -p 3306:3306 $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text):latest
+```
+* Check if the container is running:
+```sh
+podman ps --noheading --format '{{.ID}}\t{{.Command}}\t{{.CreatedAt}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'
+```
+* Expected output (container id and date will vary):
+```sh
+7446dd07b960    mariadbd        2025-05-22 11:42:40.094091818 -0500 CDT Up About a minute       0.0.0.0:3306->3306/tcp  cattlepoint-database
+```
+* Connect to the database and confirm it is running:
+```sh
+podman run --rm -it --network container:cattlepoint-database mariadb \
+  mariadb -h127.0.0.1 -P3306 -uroot -prootpassword
+show databases;
+exit;
+```
+* Expected output:
+```sh
+Welcome to the MariaDB monitor.  Commands end with ; or \g.
+Your MariaDB connection id is 5
+Server version: 11.7.2-MariaDB-ubu2404 mariadb.org binary distribution
+
+Copyright (c) 2000, 2018, Oracle, MariaDB Corporation Ab and others.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+MariaDB [(none)]> show databases;
++--------------------+
+| Database           |
++--------------------+
+| appdb              |
+| information_schema |
+| mysql              |
+| performance_schema |
+| sys                |
++--------------------+
+5 rows in set (0.002 sec)
+
+MariaDB [(none)]> ^DBye
+```
+
+#### This section creates the backend container, pushes it to the ECR repository, and runs the container
+* Create the ECR repository for the api container:
+```sh
+aws ecr create-repository --repository-name cattlepoint-backend --query 'repository.repositoryUri' --output text
+```
+* Expected output:
+```sh
+***.dkr.ecr.us-east-1.amazonaws.com/cattlepoint-backend
+```
+* Log podman into the new backend container ECR repository:
+```sh
+podman login -u AWS -p $(aws ecr get-login-password) $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text)
+```
+* Expected output:
+```sh
+Login Succeeded!
+```
+* Create the Docker container for the backend container using the supplied backend Dockerfile:
+```sh
+podman build -t $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text):latest backend/.
+```
+* Push the backend container to the ECR repository:
+```sh
+podman push $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text):latest
+```
+* Delete the local copy of the backend container image:
+```sh
+podman image rm $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text):latest
+```
+* Start the backend container using the ECR repository:
+```sh
+podman run -d --name cattlepoint-backend -p 8000:8000 $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text):latest
+```
+* Check if the container is running:
+```sh
+podman ps --noheading --format '{{.ID}}\t{{.Command}}\t{{.CreatedAt}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'
+```
+* Expected output (container id and date will vary):
+```sh
+1f703fbcb298    python app.py   2025-05-22 12:38:48.077546127 -0500 CDT Up About an hour        0.0.0.0:8000->8000/tcp  cattlepoint-backend
+```
+* Connect to the backend and confirm it is running:
+```sh
+curl 'http://localhost:8000/healthcheck' && curl 'http://localhost:8000/bulletins'
+```
+* Expected output:
+```sh
+% curl 'http://localhost:8000/healthcheck' && curl 'http://localhost:8000/bulletins'
+{"status":"ok"}
+[]
+```
+
+
+
+#### This section creates the frontend container, pushes it to the ECR repository, and runs the container
+* Create the ECR repository for the api container:
+```sh
+aws ecr create-repository --repository-name cattlepoint-frontend --query 'repository.repositoryUri' --output text
+```
+* Expected output:
+```sh
+***.dkr.ecr.us-east-1.amazonaws.com/cattlepoint-frontend
+```
+* Log podman into the new frontend container ECR repository:
+```sh
+podman login -u AWS -p $(aws ecr get-login-password) $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text)
+```
+* Expected output:
+```sh
+Login Succeeded!
+```
+* Create the Docker container for the frontend container using the supplied frontend Dockerfile:
+```sh
+podman build -t $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text):latest frontend/.
+```
+* Push the frontend container to the ECR repository:
+```sh
+podman push $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text):latest
+```
+* Delete the local copy of the frontend container image:
+```sh
+podman image rm $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text):latest
+```
+* Start the frontend container using the ECR repository:
+```sh
+podman run -d --name cattlepoint-frontend -p 8080:80 $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text):latest
+```
+* Check if the container is running:
+```sh
+podman ps --noheading --format '{{.ID}}\t{{.Command}}\t{{.CreatedAt}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'
+```
+* Expected output (container id and date will vary):
+```sh
+3291134fd3b9    nginx -g daemon o...    2025-05-22 12:14:39.778088765 -0500 CDT Up 5 seconds    0.0.0.0:8080->80/tcp    cattlepoint-frontend
+```
+* Connect to the frontend and confirm it is running:
+```sh
+curl -s http://localhost:8080 |grep Bulletin
+open http://localhost:8080
+```
+* Expected output:
+```sh
+% curl -s http://localhost:8080 |grep Bulletin
+        <title>Cattle Sales Bulletin</title>
+            function fetchBulletins() {
+                    fetchBulletins();
+            fetchBulletins();
+```
+
+#### This section creates a seed container to populate the database and runs the container
+* Create the Docker container for the seed container using the supplied seed Dockerfile:
+```sh
+podman build -t seed:latest seed/.
+```
+* Start the frontend container using the ECR repository:
+```sh
+podman run --rm --name cattlepoint-seed seed:latest
+```
+* Expected output (container id and date will vary):
+```sh
+% podman run --rm --name cattlepoint-seed seed:latest
+⏳ waiting for host.containers.internal …
+🚀 seeding appdb
+✅ done
+```
+* Check if the seed container ran:
+```sh
+curl -s http://localhost:8000/bulletins
+```
+* Expected output:
+```sh
+% curl -s http://localhost:8000/bulletins
+[{"id":10,"location":"TX","price":"1200.00","title":"Longhorn yearling"},{"id":9,"location":"TX","price":"1900.00","title":"Brangus bred heifer"},{"id":8,"location":"CO","price":"2400.00","title":"Gelbvieh bull"},{"id":7,"location":"SD","price":"3200.00","title":"Red Angus cow-calf pair"},{"id":6,"location":"MO","price":"1700.00","title":"Limousin steer"},{"id":5,"location":"NE","price":"1550.00","title":"Simmental heifer"},{"id":4,"location":"TX","price":"1600.00","title":"Brahman cow"},{"id":3,"location":"KS","price":"2500.00","title":"Charolais bull"},{"id":2,"location":"OK","price":"1500.00","title":"Hereford heifer"},{"id":1,"location":"TX","price":"1800.00","title":"Angus steer"}]
+```
+
+#### This section verifies the app works in the browser
+* Open the cattlepoint website:
+```sh
+open 'http://localhost:8080'
+```
+* Visually verify that there are cattle sales listed
+* Add a new cattle sale:
+```text
+login with user: admin
+login with password: admin
+click Login
+Title: midnight bull
+Price: 5000
+Location: CA
+click Add
+```
+* Visually verify that the new midnight bull is present in the list
+
 ## 10 points – Deploy an Amazon EKS cluster
+### In this section you will create an Amazon EKS cluster using eksctl
+* Verify AWS credentials are working:
+```sh
+export AWS_PROFILE=eruser315
+aws sts get-caller-identity
+```
+* Visually verify in output: arn:aws:iam::***:user/eruser315
+* Create the EKS cluster using eksctl:
+```sh
+eksctl create cluster -f cluster.yaml
+```
+* Wait for the cluster to be created. This may take a while.
+* Expected output:
+```sh
+2025-05-22 11:34:03 [ℹ]  eksctl version 0.208.0-dev+bcdd6ecb0.2025-05-12T20:08:12Z
+....status output here....
+2025-05-22 11:34:04 [ℹ]  creating EKS cluster "cattlepoint-cluster" in "us-east-1" region with Fargate profile and managed nodes
+....status output here....
+2025-05-22 11:56:20 [✔]  EKS cluster "cattlepoint-cluster" in "us-east-1" region is ready
+```
+* Verify the cluster is created and running:
+```sh
+kubectl get nodes
+kubectl get pods --all-namespaces
+```
+* Expected output (ips and names will vary):
+```sh
+% kubectl get nodes
+NAME                              STATUS   ROLES    AGE     VERSION
+ip-192-168-108-233.ec2.internal   Ready    <none>   8m9s    v1.31.7-eks-473151a
+ip-192-168-87-152.ec2.internal    Ready    <none>   8m19s   v1.31.7-eks-473151a
+
+% kubectl get pods --all-namespaces
+NAMESPACE           NAME                                                              READY   STATUS    RESTARTS   AGE
+amazon-cloudwatch   amazon-cloudwatch-observability-controller-manager-779549c8n92z   1/1     Running   0          3m39s
+amazon-cloudwatch   cloudwatch-agent-gxv74                                            1/1     Running   0          3m34s
+amazon-cloudwatch   cloudwatch-agent-t6z4k                                            1/1     Running   0          3m33s
+amazon-cloudwatch   fluent-bit-btnbb                                                  1/1     Running   0          3m39s
+amazon-cloudwatch   fluent-bit-nwbj8                                                  1/1     Running   0          3m39s
+kube-system         aws-node-g42n6                                                    2/2     Running   0          8m14s
+kube-system         aws-node-jnccw                                                    2/2     Running   0          8m24s
+kube-system         coredns-54fb474b58-fb765                                          1/1     Running   0          16m
+kube-system         coredns-54fb474b58-rckwg                                          1/1     Running   0          16m
+kube-system         ebs-csi-controller-5bc6c8f8b7-97cgv                               6/6     Running   0          4m45s
+kube-system         ebs-csi-controller-5bc6c8f8b7-dtxkv                               6/6     Running   0          4m45s
+kube-system         ebs-csi-node-pp7zr                                                3/3     Running   0          4m45s
+kube-system         ebs-csi-node-v82j6                                                3/3     Running   0          4m45s
+kube-system         kube-proxy-b45q5                                                  1/1     Running   0          8m24s
+kube-system         kube-proxy-m5zrs                                                  1/1     Running   0          8m14s
+kube-system         metrics-server-7ccfcc47f5-mbvvn                                   1/1     Running   0          16m
+kube-system         metrics-server-7ccfcc47f5-z2clz                                   1/1     Running   0          16m
+```
+
 ## 40 points – Deploy your application, including a backend database
 ## 10 points – Test updating your application using rolling updates
+## Clean up your cluster
+### In this section you will delete the EKS cluster and the ECR repositories
+* For this section, you will need to have cloned the repository to your local machine.  You can do this by running the following command in your terminal:
+```sh
+gh repo clone cattlepoint/cattlepoint-aer3-week2
+```
+* For this section, make sure you are in the repository directory:
+```sh
+cd cattlepoint-aer3-week2
+```
+* Verify AWS credentials are working:
+```sh
+export AWS_PROFILE=eruser315
+aws sts get-caller-identity
+```
+* Visually verify in output: arn:aws:iam::***:user/eruser315
+* Delete the EKS cluster:
+```sh
+% eksctl delete cluster -f cluster.yaml
+```
+* Expected output (date will vary):
+```sh
+2025-05-22 11:30:07 [ℹ]  deleting EKS cluster "cattlepoint-cluster"
+....status output here....
+2025-05-22 11:30:45 [✔]  all cluster resources were deleted
+```

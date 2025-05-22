@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Cattle Sales Bulletin</title>
+        <style>
+            body {
+                font-family: sans-serif;
+                margin: 2rem;
+            }
+            table {
+                border-collapse: collapse;
+                width: 100%;
+            }
+            th,
+            td {
+                border: 1px solid #ccc;
+                padding: 0.5rem;
+                text-align: left;
+            }
+            form {
+                margin-bottom: 2rem;
+            }
+            input,
+            button {
+                margin: 0.25rem;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Cattle Sales</h1>
+
+        <!-- Login -->
+        <form id="login">
+            <input name="user" placeholder="user" required />
+            <input name="pass" placeholder="pass" type="password" required />
+            <button>Login</button>
+        </form>
+
+        <!-- Add bulletin (hidden until logged in) -->
+        <form id="add" hidden>
+            <input name="title" placeholder="Title" required />
+            <input name="price" placeholder="Price" required />
+            <input name="location" placeholder="Location" required />
+            <button>Add</button>
+        </form>
+
+        <table id="tbl">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Price</th>
+                    <th>Location</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+
+        <script>
+            const api = (origin) =>
+                origin.replace(/^http:\/\/[^/]+/, "http://localhost:8000"); // if served via compose
+
+            let token = null;
+
+            function fetchBulletins() {
+                fetch(api(location.origin) + "/bulletins")
+                    .then((r) => r.json())
+                    .then((rows) => {
+                        const tb = document.querySelector("#tbl tbody");
+                        tb.innerHTML = "";
+                        rows.forEach((r) => {
+                            tb.insertRow().innerHTML = `<td>${r.title}</td><td>${r.price}</td><td>${r.location}</td>`;
+                        });
+                    });
+            }
+
+            document.getElementById("login").onsubmit = (e) => {
+                e.preventDefault();
+                const data = Object.fromEntries(
+                    new FormData(e.target).entries(),
+                );
+                fetch(api(location.origin) + "/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data),
+                })
+                    .then((r) => r.json())
+                    .then((j) => {
+                        token = j.token;
+                        if (token) {
+                            e.target.hidden = true;
+                            document.getElementById("add").hidden = false;
+                        }
+                    });
+            };
+
+            document.getElementById("add").onsubmit = (e) => {
+                e.preventDefault();
+                const data = Object.fromEntries(
+                    new FormData(e.target).entries(),
+                );
+                fetch(api(location.origin) + "/bulletins", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: "Bearer " + token,
+                    },
+                    body: JSON.stringify(data),
+                }).then(() => {
+                    e.target.reset();
+                    fetchBulletins();
+                });
+            };
+
+            fetchBulletins();
+        </script>
+    </body>
+</html>
