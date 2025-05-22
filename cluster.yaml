@@ -41,10 +41,10 @@ addons:
 managedNodeGroups:
   - name: nodegroup-1
     spot: true
-    instanceTypes: ["t2.medium"]
-    minSize: 2
-    desiredCapacity: 2
-    maxSize: 4
+    instanceTypes: ["t3.medium"]
+    minSize: 1
+    desiredCapacity: 3
+    maxSize: 6
     volumeEncrypted: true
     privateNetworking: true
     iam:
