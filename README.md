@@ -98,6 +98,32 @@ aws sts get-caller-identity
 ```
 * Visually verify in output: arn:aws:iam::***:user/eruser315
 
+#### This section shows a quick-start method for the below sections
+* This step is _unneccessary_ and is simply a quick-start method:
+```sh
+aws ecr create-repository --repository-name cattlepoint-database --query 'repository.repositoryUri' --output text
+
+aws ecr create-repository --repository-name cattlepoint-backend --query 'repository.repositoryUri' --output text
+
+aws ecr create-repository --repository-name cattlepoint-frontend --query 'repository.repositoryUri' --output text
+
+podman login -u AWS -p $(aws ecr get-login-password) $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text)
+
+podman login -u AWS -p $(aws ecr get-login-password) $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text)
+
+podman login -u AWS -p $(aws ecr get-login-password) $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text)
+
+podman rm -f cattlepoint-database && podman build -t $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text):latest database/. && podman push $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text):latest && podman image rm $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text):latest && podman run -d --name cattlepoint-database -p 3306:3306 $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text):latest
+
+podman rm -f cattlepoint-backend && podman build -t $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text):latest backend/. && podman push $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text):latest &&  podman image rm $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text):latest && podman run -d --name cattlepoint-backend -p 8000:8000 $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text):latest &&  sleep 3 && curl 'http://localhost:8000/healthcheck'
+
+podman rm -f cattlepoint-frontend && podman build -t $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text):latest frontend/. &&  podman push $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text):latest && podman image rm $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text):latest && podman run -d --name cattlepoint-frontend -p 8080:80 $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text):latest &&  sleep 3 && curl -s http://localhost:8080 |grep Bulletin
+
+podman build -t seed:latest seed/. && podman run --rm --name cattlepoint-seed seed:latest
+
+curl -s http://localhost:8000/bulletins
+```
+
 #### This section creates the database container, pushes it to the ECR repository, and runs the container
 * Create the ECR repository for the database container:
 ```sh
@@ -349,6 +375,7 @@ eksctl create cluster -f cluster.yaml
 ```sh
 kubectl get nodes
 kubectl get pods --all-namespaces
+kubectl describe svc
 ```
 * Expected output (ips and names will vary):
 ```sh
@@ -376,6 +403,25 @@ kube-system         kube-proxy-b45q5                                            
 kube-system         kube-proxy-m5zrs                                                  1/1     Running   0          8m14s
 kube-system         metrics-server-7ccfcc47f5-mbvvn                                   1/1     Running   0          16m
 kube-system         metrics-server-7ccfcc47f5-z2clz                                   1/1     Running   0          16m
+
+% kubectl describe svc
+Name:                     kubernetes
+Namespace:                default
+Labels:                   component=apiserver
+                          provider=kubernetes
+Annotations:              <none>
+Selector:                 <none>
+Type:                     ClusterIP
+IP Family Policy:         SingleStack
+IP Families:              IPv4
+IP:                       10.100.0.1
+IPs:                      10.100.0.1
+Port:                     https  443/TCP
+TargetPort:               443/TCP
+Endpoints:                192.168.105.179:443,192.168.73.71:443
+Session Affinity:         None
+Internal Traffic Policy:  Cluster
+Events:                   <none>
 ```
 
 ## 40 points – Deploy your application, including a backend database
