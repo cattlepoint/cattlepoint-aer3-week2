@@ -57,13 +57,24 @@
         </table>
 
         <script>
-            const api = (origin) =>
-                origin.replace(/^http:\/\/[^/]+/, "http://localhost:8000"); // if served via compose
+            // default to local backend
+            let baseUrl = "http://localhost:8000";
 
+            // probe /api/healthcheck once at startup
+            fetch(location.origin + "/api/healthcheck")
+                .then((r) => (r.ok ? r.json() : null))
+                .then((j) => {
+                    if (j && j.status === "ok") {
+                        baseUrl = location.origin + "/api";
+                    }
+                })
+                .finally(fetchBulletins); // load data after base is chosen
+
+            const api = (path) => baseUrl + path;
             let token = null;
 
             function fetchBulletins() {
-                fetch(api(location.origin) + "/bulletins")
+                fetch(api("/bulletins"))
                     .then((r) => r.json())
                     .then((rows) => {
                         const tb = document.querySelector("#tbl tbody");
@@ -79,7 +90,7 @@
                 const data = Object.fromEntries(
                     new FormData(e.target).entries(),
                 );
-                fetch(api(location.origin) + "/login", {
+                fetch(api("/login"), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(data),
@@ -99,7 +110,7 @@
                 const data = Object.fromEntries(
                     new FormData(e.target).entries(),
                 );
-                fetch(api(location.origin) + "/bulletins", {
+                fetch(api("/bulletins"), {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -111,8 +122,6 @@
                     fetchBulletins();
                 });
             };
-
-            fetchBulletins();
         </script>
     </body>
 </html>
