@@ -1,0 +1,125 @@
+# cattlepoint-deployment with account ID parameterized
+# envsubst will replace ${ACCOUNT_ID} at deploy time
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mariadb-pvc
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: gp2
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cattlepoint-database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cattlepoint-database
+  template:
+    metadata:
+      labels:
+        app: cattlepoint-database
+    spec:
+      containers:
+        - name: mariadb
+          image: ${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cattlepoint-database:latest
+          ports:
+            - containerPort: 3306
+          env:
+            - { name: MYSQL_ROOT_PASSWORD, value: "rootpassword" }
+            - { name: MYSQL_DATABASE, value: "appdb" }
+            - { name: MYSQL_USER, value: "appuser" }
+            - { name: MYSQL_PASSWORD, value: "apppassword" }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/mysql }
+      volumes:
+        - { name: data, persistentVolumeClaim: { claimName: mariadb-pvc } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cattlepoint-database
+spec:
+  selector:
+    app: cattlepoint-database
+  ports:
+    - port: 3306
+      targetPort: 3306
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cattlepoint-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cattlepoint-backend
+  template:
+    metadata:
+      labels:
+        app: cattlepoint-backend
+    spec:
+      containers:
+        - name: backend
+          image: ${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cattlepoint-backend:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - { name: DB_HOST, value: "cattlepoint-database" }
+            - { name: DB_PORT, value: "3306" }
+            - { name: DB_USER, value: "appuser" }
+            - { name: DB_PASS, value: "apppassword" }
+            - { name: DB_NAME, value: "appdb" }
+            - { name: JWT_SECRET, value: "change-me" }
+            - { name: API_ADDR, value: "0.0.0.0" }
+            - { name: API_PORT, value: "8000" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cattlepoint-backend
+spec:
+  selector:
+    app: cattlepoint-backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cattlepoint-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cattlepoint-frontend
+  template:
+    metadata:
+      labels:
+        app: cattlepoint-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/cattlepoint-frontend:latest
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cattlepoint-frontend
+spec:
+  type: LoadBalancer
+  selector:
+    app: cattlepoint-frontend
+  ports:
+    - port: 80
+      targetPort: 80
