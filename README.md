@@ -101,27 +101,13 @@ aws sts get-caller-identity
 #### This section shows a quick-start method for the below sections
 * This step is _unneccessary_ and is simply a quick-start method:
 ```sh
-aws ecr create-repository --repository-name cattlepoint-database --query 'repository.repositoryUri' --output text
+aws ecr delete-repository --repository-name cattlepoint-database; aws ecr create-repository --repository-name cattlepoint-database --query 'repository.repositoryUri' --output text && podman login -u AWS -p $(aws ecr get-login-password) $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text) && podman rm -f cattlepoint-database && podman build -t $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text):latest database/. && podman push $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text):latest && podman image rm $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text):latest && podman run -d --name cattlepoint-database -p 3306:3306 $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text):latest
 
-aws ecr create-repository --repository-name cattlepoint-backend --query 'repository.repositoryUri' --output text
+aws ecr delete-repository --repository-name cattlepoint-backend; aws ecr create-repository --repository-name cattlepoint-backend --query 'repository.repositoryUri' --output text && podman login -u AWS -p $(aws ecr get-login-password) $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text) && podman rm -f cattlepoint-backend && podman build -t $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text):latest backend/. && podman push $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text):latest &&  podman image rm $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text):latest && podman run -d --name cattlepoint-backend -p 8000:8000 $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text):latest &&  sleep 3 && curl 'http://localhost:8000/healthcheck'
 
-aws ecr create-repository --repository-name cattlepoint-frontend --query 'repository.repositoryUri' --output text
+aws ecr delete-repository --repository-name cattlepoint-frontend; aws ecr create-repository --repository-name cattlepoint-frontend --query 'repository.repositoryUri' --output text && podman login -u AWS -p $(aws ecr get-login-password) $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text) && podman rm -f cattlepoint-frontend && podman build -t $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text):latest frontend/. &&  podman push $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text):latest && podman image rm $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text):latest && podman run -d --name cattlepoint-frontend -p 8080:80 $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text):latest &&  sleep 3 && curl -s http://localhost:8080 |grep Bulletin
 
-podman login -u AWS -p $(aws ecr get-login-password) $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text)
-
-podman login -u AWS -p $(aws ecr get-login-password) $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text)
-
-podman login -u AWS -p $(aws ecr get-login-password) $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text)
-
-podman rm -f cattlepoint-database && podman build -t $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text):latest database/. && podman push $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text):latest && podman image rm $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text):latest && podman run -d --name cattlepoint-database -p 3306:3306 $(aws ecr describe-repositories --repository-names cattlepoint-database --query 'repositories[0].repositoryUri' --output text):latest
-
-podman rm -f cattlepoint-backend && podman build -t $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text):latest backend/. && podman push $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text):latest &&  podman image rm $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text):latest && podman run -d --name cattlepoint-backend -p 8000:8000 $(aws ecr describe-repositories --repository-names cattlepoint-backend --query 'repositories[0].repositoryUri' --output text):latest &&  sleep 3 && curl 'http://localhost:8000/healthcheck'
-
-podman rm -f cattlepoint-frontend && podman build -t $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text):latest frontend/. &&  podman push $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text):latest && podman image rm $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text):latest && podman run -d --name cattlepoint-frontend -p 8080:80 $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text):latest &&  sleep 3 && curl -s http://localhost:8080 |grep Bulletin
-
-podman build -t seed:latest seed/. && podman run --rm --name cattlepoint-seed seed:latest
-
-curl -s http://localhost:8000/bulletins
+podman build -t seed:latest seed/. && podman run --rm --name cattlepoint-seed seed:latest && curl -s http://localhost:8000/bulletins
 ```
 
 #### This section creates the database container, pushes it to the ECR repository, and runs the container
@@ -423,17 +409,76 @@ Session Affinity:         None
 Internal Traffic Policy:  Cluster
 Events:                   <none>
 ```
+### In this section you will delete the EKS cluster and the ECR repositories
+* Delete the EKS cluster:
+```sh
+% eksctl delete cluster -f cluster.yaml
+```
+* Expected output (date will vary):
+```sh
+2025-05-22 11:30:07 [ℹ]  deleting EKS cluster "cattlepoint-cluster"
+....status output here....
+2025-05-22 11:30:45 [✔]  all cluster resources were deleted
+```
 
 ## 40 points – Deploy your application, including a backend database
 ### In this section we will deploy the previous containers in EKS
-* Update the cattlepoint-deployment.v1.yaml in a text editor and replace the <ACCOUNT_ID> with your account id
+* For this section, you will need to have cloned the repository to your local machine.  You can do this by running the following command in your terminal:
+```sh
+gh repo clone cattlepoint/cattlepoint-aer3-week2
+```
+* For this section, make sure you are in the repository directory:
+```sh
+cd cattlepoint-aer3-week2
+```
+* Verify AWS credentials are working:
+```sh
+export AWS_PROFILE=eruser315
+aws sts get-caller-identity
+```
+* Visually verify in output: arn:aws:iam::***:user/eruser315
+* Create the EKS cluster using eksctl:
+```sh
+eksctl create cluster -f cluster-arm64.yaml
+```
+* Wait for the cluster to be created. This may take a while.
+* Expected output:
+```sh
+% eksctl create cluster -f cluster-arm64.yaml
+2025-05-22 18:06:32 [ℹ]  eksctl version 0.208.0-dev+bcdd6ecb0.2025-05-12T20:08:12Z
+2025-05-22 18:06:32 [ℹ]  using region us-east-1
+....status output here....
+2025-05-22 18:06:32 [ℹ]  using Kubernetes version 1.32
+2025-05-22 18:06:32 [ℹ]  creating EKS cluster "cattlepoint-cluster" in "us-east-1" region with managed nodes
+....status output here....
+2025-05-22 18:26:06 [✔]  EKS cluster "cattlepoint-cluster" in "us-east-1" region is ready
+```
+* Verify the cluster is created and running:
+```sh
+kubectl get nodes,pods,svc
+```
+* Expected output (ips and names will vary):
+```sh
+% kubectl get nodes,pods,svc
+NAME                                   STATUS   ROLES    AGE     VERSION
+node/ip-192-168-122-158.ec2.internal   Ready    <none>   6m35s   v1.32.3-eks-473151a
+node/ip-192-168-89-237.ec2.internal    Ready    <none>   7m38s   v1.32.3-eks-473151a
+node/ip-192-168-91-109.ec2.internal    Ready    <none>   7m36s   v1.32.3-eks-473151a
+
+NAME                 TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/kubernetes   ClusterIP   10.100.0.1   <none>        443/TCP   16m
+```
+* Create a variable with the AWS ACCOUNT_ID:
+```sh
+export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+```
 * Apply the Kubernetes template cattlepoint-deployment.v1.yaml
 ```sh
-kubectl apply -f cattlepoint-deployment.v1.yaml
+cat cattlepoint-deployment.v1.yaml | envsubst | kubectl apply -f -
 ```
 * Expected output:
 ```sh
-% kubectl apply -f cattlepoint-deployment.v1.yaml
+% cat cattlepoint-deployment.v1.yaml | envsubst | kubectl apply -f -
 persistentvolumeclaim/mariadb-pvc created
 deployment.apps/cattlepoint-database created
 service/cattlepoint-database created
@@ -449,46 +494,55 @@ kubectl get pods
 * Expected output (container id and date will vary):
 ```sh
 % kubectl get pods
+NAME                                    READY   STATUS    RESTARTS   AGE
+cattlepoint-backend-79fd6ff5c-48564     1/1     Running   0          96s
+cattlepoint-backend-79fd6ff5c-t9sg9     1/1     Running   0          96s
+cattlepoint-database-859bf7f4d-jxjsj    1/1     Running   0          96s
+cattlepoint-frontend-59bcfdd9dd-68lvs   1/1     Running   0          96s
+cattlepoint-frontend-59bcfdd9dd-dkvpq   1/1     Running   0          96s
 ```
 * Obtain the URL of the frontend service:
 ```sh
-kubectl get svc cattlepoint-frontend
+kubectl get svc cattlepoint-frontend \
+  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 ```
 * Expected output (container id and date will vary):
 ```sh
-% kubectl get svc cattlepoint-frontend
-NAME                   TYPE           CLUSTER-IP      EXTERNAL-IP                                                              PORT(S)        AGE
-cattlepoint-frontend   LoadBalancer   10.100.210.28   a45e9b9d7bf194569a3af2ef84f92e79-114768359.us-east-1.elb.amazonaws.com   80:31911/TCP   117s
+% kubectl get svc cattlepoint-frontend \
+  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+afec1d935cd1d4c39b3ffd2d3e4755e1-1738021288.us-east-1.elb.amazonaws.com
+```
+* Test the cattlepoint website:
+```sh
+curl -s "http://$(kubectl get svc cattlepoint-frontend \
+  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')" | grep Bulletin
+```
+* Expected output:
+```sh
+% curl -s "http://$(kubectl get svc cattlepoint-frontend \
+  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')" | grep Bulletin
+        <title>Cattle Sales Bulletin</title>
+            function fetchBulletins() {
+                    fetchBulletins();
+            fetchBulletins();
 ```
 * Open the cattlepoint website:
 ```sh
-open http://a45e9b9d7bf194569a3af2ef84f92e79-114768359.us-east-1.elb.amazonaws.com
+open "http://$(kubectl get svc cattlepoint-frontend \
+  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
 ```
+* Visually verify that there are cattle sales listed
+* Add a new cattle sale:
+```text
+login with user: admin
+login with password: admin
+click Login
+Title: midnight bull
+Price: 5000
+Location: CA
+click Add
+```
+* Visually verify that the new midnight bull is present in the list
+
 
 ## 10 points – Test updating your application using rolling updates
-## Clean up your cluster
-### In this section you will delete the EKS cluster and the ECR repositories
-* For this section, you will need to have cloned the repository to your local machine.  You can do this by running the following command in your terminal:
-```sh
-gh repo clone cattlepoint/cattlepoint-aer3-week2
-```
-* For this section, make sure you are in the repository directory:
-```sh
-cd cattlepoint-aer3-week2
-```
-* Verify AWS credentials are working:
-```sh
-export AWS_PROFILE=eruser315
-aws sts get-caller-identity
-```
-* Visually verify in output: arn:aws:iam::***:user/eruser315
-* Delete the EKS cluster:
-```sh
-% eksctl delete cluster -f cluster.yaml
-```
-* Expected output (date will vary):
-```sh
-2025-05-22 11:30:07 [ℹ]  deleting EKS cluster "cattlepoint-cluster"
-....status output here....
-2025-05-22 11:30:45 [✔]  all cluster resources were deleted
-```
