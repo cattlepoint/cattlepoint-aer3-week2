@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Cattle Sales Bulletin v2</title>
+        <style>
+            :root {
+                /* Color-blind friendly palette (Okabe & Ito) */
+                --color-primary: #0072b2; /* Blue */
+                --color-secondary: #e69f00; /* Orange */
+                --color-accent: #009e73; /* Bluish green */
+                --color-bg: #f5f5f5;
+                --color-table-even: #e8f0fa;
+                --color-table-odd: #ffffff;
+                --color-hover: #56b4e9; /* Sky blue */
+                --color-header: #000000; /* Black for strong contrast */
+            }
+
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --color-bg: #1a1a1a;
+                    --color-table-even: #232b2b;
+                    --color-table-odd: #181818;
+                    --color-header: #ffffff;
+                }
+            }
+
+            body {
+                font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                margin: 2rem;
+                background: var(--color-bg);
+                color: #111;
+            }
+
+            h1 {
+                color: var(--color-primary);
+                margin-bottom: 1.5rem;
+            }
+
+            table {
+                border-collapse: collapse;
+                width: 100%;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            }
+
+            th,
+            td {
+                border: 1px solid #bbb;
+                padding: 0.75rem;
+                text-align: left;
+            }
+
+            thead th {
+                background: var(--color-primary);
+                color: var(--color-header);
+            }
+
+            tbody tr:nth-child(odd) {
+                background: var(--color-table-odd);
+            }
+
+            tbody tr:nth-child(even) {
+                background: var(--color-table-even);
+            }
+
+            tbody tr:hover {
+                background: var(--color-hover);
+                color: #000;
+                transition: background 0.2s ease;
+            }
+
+            form {
+                margin-bottom: 2rem;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+
+            input {
+                padding: 0.5rem 0.75rem;
+                border: 1px solid #bbb;
+                border-radius: 4px;
+                flex: 1 1 160px;
+            }
+
+            button {
+                padding: 0.5rem 1rem;
+                background: var(--color-secondary);
+                color: #fff;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                transition: background 0.2s ease;
+            }
+
+            button:hover {
+                background: var(--color-primary);
+            }
+
+            button:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Cattle Sales</h1>
+
+        <!-- Login -->
+        <form id="login">
+            <input name="user" placeholder="user" required />
+            <input name="pass" placeholder="pass" type="password" required />
+            <button>Login</button>
+        </form>
+
+        <!-- Add bulletin (hidden until logged in) -->
+        <form id="add" hidden>
+            <input name="title" placeholder="Title" required />
+            <input name="price" placeholder="Price" required />
+            <input name="location" placeholder="Location" required />
+            <button>Add</button>
+        </form>
+
+        <table id="tbl">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Price</th>
+                    <th>Location</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+
+        <script>
+            // default to local backend
+            let baseUrl = "http://localhost:8000";
+
+            // probe /api/healthcheck once at startup
+            fetch(location.origin + "/api/healthcheck")
+                .then((r) => (r.ok ? r.json() : null))
+                .then((j) => {
+                    if (j && j.status === "ok") {
+                        baseUrl = location.origin + "/api";
+                    }
+                })
+                .finally(fetchBulletins); // load data after base is chosen
+
+            const api = (path) => baseUrl + path;
+            let token = null;
+
+            function fetchBulletins() {
+                fetch(api("/bulletins"))
+                    .then((r) => r.json())
+                    .then((rows) => {
+                        const tb = document.querySelector("#tbl tbody");
+                        tb.innerHTML = "";
+                        rows.forEach((r) => {
+                            tb.insertRow().innerHTML = `<td>${r.title}</td><td>${r.price}</td><td>${r.location}</td>`;
+                        });
+                    });
+            }
+
+            document.getElementById("login").onsubmit = (e) => {
+                e.preventDefault();
+                const data = Object.fromEntries(
+                    new FormData(e.target).entries(),
+                );
+                fetch(api("/login"), {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data),
+                })
+                    .then((r) => r.json())
+                    .then((j) => {
+                        token = j.token;
+                        if (token) {
+                            e.target.hidden = true;
+                            document.getElementById("add").hidden = false;
+                        }
+                    });
+            };
+
+            document.getElementById("add").onsubmit = (e) => {
+                e.preventDefault();
+                const data = Object.fromEntries(
+                    new FormData(e.target).entries(),
+                );
+                fetch(api("/bulletins"), {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: "Bearer " + token,
+                    },
+                    body: JSON.stringify(data),
+                }).then(() => {
+                    e.target.reset();
+                    fetchBulletins();
+                });
+            };
+        </script>
+    </body>
+</html>
