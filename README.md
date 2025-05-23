@@ -522,9 +522,20 @@ curl -s "http://$(kubectl get svc cattlepoint-frontend \
 % curl -s "http://$(kubectl get svc cattlepoint-frontend \
   -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')" | grep Bulletin
         <title>Cattle Sales Bulletin</title>
+                .finally(fetchBulletins); // load data after base is chosen
             function fetchBulletins() {
                     fetchBulletins();
-            fetchBulletins();
+```
+* Confirm the frontend - backend - database connection:
+```sh
+curl -s "http://$(kubectl get svc cattlepoint-frontend \
+  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"/api/healthcheck
+```
+* Expected output:
+```sh
+% curl -s "http://$(kubectl get svc cattlepoint-frontend \
+  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"/api/healthcheck
+{"status":"ok"}
 ```
 * Open the cattlepoint website:
 ```sh
