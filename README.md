@@ -412,7 +412,7 @@ Events:                   <none>
 ### In this section you will delete the EKS cluster and the ECR repositories
 * Delete the EKS cluster:
 ```sh
-% eksctl delete cluster -f cluster.yaml
+eksctl delete cluster -f cluster.yaml
 ```
 * Expected output (date will vary):
 ```sh
@@ -555,5 +555,127 @@ click Add
 ```
 * Visually verify that the new midnight bull is present in the list
 
-
 ## 10 points – Test updating your application using rolling updates
+### In this section we will upgrade the frontend to a new version with some flair
+* Create the Docker container for the frontend v2 container using the supplied frontend2 Dockerfile:
+```sh
+podman build -t $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text):flair frontendv2/.
+```
+* Push the frontend container to the ECR repository:
+```sh
+podman push $(aws ecr describe-repositories --repository-names cattlepoint-frontend --query 'repositories[0].repositoryUri' --output text):flair
+```
+* Apply the Kubernetes template cattlepoint-deployment.v2.yaml
+```sh
+cat cattlepoint-deployment.v2.yaml | envsubst | kubectl apply -f - && kubectl get pods -w
+```
+* Expected output:
+```sh
+% cat cattlepoint-deployment.v2.yaml | envsubst | kubectl apply -f - && kubectl get pods -w
+persistentvolumeclaim/mariadb-pvc unchanged
+deployment.apps/cattlepoint-database unchanged
+service/cattlepoint-database unchanged
+deployment.apps/cattlepoint-backend unchanged
+service/cattlepoint-backend unchanged
+deployment.apps/cattlepoint-frontend configured
+service/cattlepoint-frontend unchanged
+NAME                                    READY   STATUS              RESTARTS   AGE
+cattlepoint-backend-79fd6ff5c-9r6f6     1/1     Running             0          55m
+cattlepoint-backend-79fd6ff5c-fq5n6     1/1     Running             0          55m
+cattlepoint-database-859bf7f4d-kxb9k    1/1     Running             0          30m
+cattlepoint-frontend-59bcfdd9dd-f9rxc   1/1     Running             0          27s
+cattlepoint-frontend-59bcfdd9dd-sn6mg   1/1     Running             0          28s
+cattlepoint-frontend-84557cf5b9-g8ql9   0/1     ContainerCreating   0          1s
+cattlepoint-frontend-84557cf5b9-g8ql9   1/1     Running             0          2s
+cattlepoint-frontend-59bcfdd9dd-sn6mg   1/1     Terminating         0          29s
+cattlepoint-frontend-84557cf5b9-bj5bz   0/1     Pending             0          0s
+cattlepoint-frontend-84557cf5b9-bj5bz   0/1     Pending             0          0s
+cattlepoint-frontend-84557cf5b9-bj5bz   0/1     ContainerCreating   0          0s
+cattlepoint-frontend-59bcfdd9dd-sn6mg   0/1     Completed           0          29s
+cattlepoint-frontend-59bcfdd9dd-sn6mg   0/1     Completed           0          30s
+cattlepoint-frontend-59bcfdd9dd-sn6mg   0/1     Completed           0          30s
+cattlepoint-frontend-84557cf5b9-bj5bz   1/1     Running             0          1s
+cattlepoint-frontend-59bcfdd9dd-f9rxc   1/1     Terminating         0          29s
+cattlepoint-frontend-59bcfdd9dd-f9rxc   0/1     Completed           0          29s
+cattlepoint-frontend-59bcfdd9dd-f9rxc   0/1     Completed           0          30s
+cattlepoint-frontend-59bcfdd9dd-f9rxc   0/1     Completed           0          30s
+```
+* Open the cattlepoint website:
+```sh
+open "http://$(kubectl get svc cattlepoint-frontend \
+  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+```
+* Visually verify that there are cattle sales listed
+* Notice the colorscheme is awful.  Rollback:
+```sh
+kubectl rollout undo deployments/cattlepoint-frontend && kubectl get pods -w
+```
+* Expected output:
+```sh
+% kubectl rollout undo deployments/cattlepoint-frontend && kubectl get pods -w
+deployment.apps/cattlepoint-frontend rolled back
+NAME                                    READY   STATUS              RESTARTS   AGE
+cattlepoint-backend-79fd6ff5c-9r6f6     1/1     Running             0          61m
+cattlepoint-backend-79fd6ff5c-fq5n6     1/1     Running             0          61m
+cattlepoint-database-859bf7f4d-kxb9k    1/1     Running             0          36m
+cattlepoint-frontend-59bcfdd9dd-nsfcz   0/1     ContainerCreating   0          1s
+cattlepoint-frontend-84557cf5b9-4x8x8   1/1     Running             0          18s
+cattlepoint-frontend-84557cf5b9-cts78   1/1     Running             0          18s
+cattlepoint-frontend-59bcfdd9dd-nsfcz   1/1     Running             0          1s
+cattlepoint-frontend-84557cf5b9-4x8x8   1/1     Terminating         0          18s
+cattlepoint-frontend-59bcfdd9dd-thjcb   0/1     Pending             0          1s
+cattlepoint-frontend-59bcfdd9dd-thjcb   0/1     Pending             0          1s
+cattlepoint-frontend-59bcfdd9dd-thjcb   0/1     ContainerCreating   0          1s
+cattlepoint-frontend-84557cf5b9-4x8x8   0/1     Completed           0          19s
+cattlepoint-frontend-84557cf5b9-4x8x8   0/1     Completed           0          19s
+cattlepoint-frontend-84557cf5b9-4x8x8   0/1     Completed           0          19s
+cattlepoint-frontend-59bcfdd9dd-thjcb   1/1     Running             0          2s
+cattlepoint-frontend-84557cf5b9-cts78   1/1     Terminating         0          20s
+cattlepoint-frontend-84557cf5b9-cts78   0/1     Completed           0          20s
+cattlepoint-frontend-84557cf5b9-cts78   0/1     Completed           0          21s
+cattlepoint-frontend-84557cf5b9-cts78   0/1     Completed           0          21s
+```
+* Open the cattlepoint website:
+```sh
+open "http://$(kubectl get svc cattlepoint-frontend \
+  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+```
+* Visually verify that there are cattle sales listed and the site is back to the plain version
+
+## Bonus points – Delete the Amazon EKS cluster and clean up the Amazon Elastic Container Registry (ECR) repositories
+### In this section you will delete the Amazon EKS cluster using eksctl
+* Verify AWS credentials are working:
+```sh
+export AWS_PROFILE=eruser315
+aws sts get-caller-identity
+```
+* Visually verify in output: arn:aws:iam::***:user/eruser315
+* Delete the EKS cluster:
+```sh
+eksctl delete cluster -f cluster-arm64.yaml
+```
+* Expected output (date will vary):
+```sh
+% eksctl delete cluster -f cluster-arm64.yaml
+2025-05-22 22:17:36 [ℹ]  deleting EKS cluster "cattlepoint-cluster"
+....status output here....
+2025-05-22 22:27:49 [ℹ]  will delete stack "eksctl-cattlepoint-cluster-cluster"
+2025-05-22 22:27:50 [✔]  all cluster resources were deleted
+```
+* Delete the ECR repositories:
+```sh
+aws ecr delete-repository --repository-name cattlepoint-backend --force
+aws ecr delete-repository --repository-name cattlepoint-frontend --force
+aws ecr delete-repository --repository-name cattlepoint-database --force
+```
+* Verify all ECR repositories are deleted:
+```sh
+aws ecr describe-repositories
+```
+* Expected output:
+```sh
+% aws ecr describe-repositories
+{
+    "repositories": []
+}
+```
